@@ -61,6 +61,16 @@ It is sometimes difficult to understand how \code{chop_locator_to} should be
 constructed. In such cases, users may attach optional functions to help them
 understand the locator. Which can be done via simple \code{patch_function()} call.
 Meaning omitting all arguments.
+
+Note that few sample use-cases are supplied with the package. This may be
+accessed by
+
+\emph{\code{source(system.file("embedded","usecases.R",package = "patch"))}}
+
+However, note that these may cause problem (though it is meant for R-Studio
+actually) with R-Studio. If such things happen kindly restart the session.
+This feature is not checked as a part of package evaluations.
+So \strong{use it at your own risk}.
 }
 \examples{
 

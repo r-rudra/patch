@@ -30,7 +30,8 @@ clear_dynamic_attachment <- function() {
 # here it is only two functions to add
 dynamic_attachment <- function(what_to_add = NULL, toggle = TRUE) {
   if (!is_dynamic_attachment_done()) {
-    attach(dynamic_attachment_env, pos = 2L, name = dynamic_attachment_name)
+    # as directly using attach may cause a note in check
+    asNamespace("base")[["attach"]](dynamic_attachment_env, pos = 2L, name = dynamic_attachment_name)
     cat(
       "\nNote:",
       "locate_section and get_section added to the search path (visible to",

@@ -39,6 +39,16 @@
 #' understand the locator. Which can be done via simple `patch_function()` call.
 #' Meaning omitting all arguments.
 #'
+#' Note that few sample use-cases are supplied with the package. This may be
+#' accessed by
+#'
+#' *`source(system.file("embedded","usecases.R",package = "patch"))`*
+#'
+#' However, note that these may cause problem (though it is meant for R-Studio
+#' actually) with R-Studio. If such things happen kindly restart the session.
+#' This feature is not checked as a part of package evaluations.
+#' So **use it at your own risk**.
+#'
 #' @return Patched `function` (if the `search_str` is found)
 #' @export
 #'
