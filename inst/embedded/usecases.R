@@ -6,6 +6,7 @@ library(patch)
 # credit goes to creators of RStudio
 # Check this https://github.com/rstudio/rstudio/blob/efc873ed38a738be9dc0612d70f21f59bfd58410/src/cpp/session/modules/SessionRCompletions.R
 # Above is AGPL-3.0
+# Check this also https://support.rstudio.com/hc/en-us/articles/205273297-Code-Completion
 # this code is having the same license as main package {patch}
 
 enable_all <- function() {
