@@ -21,7 +21,7 @@ is_dynamic_attachment_done <- function() {
 # this is to clear the dynamic attachment
 clear_dynamic_attachment <- function() {
   if (is_dynamic_attachment_done()) {
-    try(detach(dynamic_attachment_name, pos = 2L, character.only = T), silent = TRUE)
+    try(detach(dynamic_attachment_name, character.only = T), silent = TRUE)
   }
 }
 
