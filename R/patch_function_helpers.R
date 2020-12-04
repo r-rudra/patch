@@ -102,12 +102,23 @@ append_in_section <- function(fbody, tloc, expr, env = NULL, after = TRUE) {
 # env to store functions
 pre_patch_function_store <- new.env()
 
-store_original_function <- function(f, env = NULL) {
-  if (!is.null(env)) {
-    fn <- as.character(substitute(f, env))
-  } else {
-    fn <- as.character(substitute(f))
+get_f_well_name <- function(f, env = environment()){
+  fn <- as.character(substitute(f, env))
+  if(length(fn)>1){
+    fn[1] <- gsub("::|:::", "from_p", fn[1])
+    fn[1] <- gsub("@", "S4_slot", fn[1])
+    fn[1] <- gsub("\\$", "dollar", fn[1])
+    fn <- paste0(fn, collapse = "_")
+    fn <- gsub("[^\\.0-9a-zA-Z_]","_", fn)
+    fn <- gsub("^_","",fn)
   }
+  fn
+}
+
+store_original_function <- function(f, env = NULL) {
+
+  fn <- get_f_well_name(f, env)
+
   if (is.null(pre_patch_function_store[[fn]])) {
     assign(fn, f, envir = pre_patch_function_store)
   } else {

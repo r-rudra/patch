@@ -8,32 +8,48 @@ patch_function(
   f,
   search_str,
   expr,
+  line_location,
   replace_it = FALSE,
   append_after = TRUE,
+  move_up_to = NULL,
   chop_locator_to = NULL,
-  env = NULL
+  env = NULL,
+  auto_assign_patched_function = FALSE,
+  no_store = FALSE
 )
 }
 \arguments{
 \item{f}{Function to modify / patch}
 
 \item{search_str}{String (or strings; in case multiple strings is given only
-first match will be considered) to find in the function body which should act
-as location of modification.}
+first match will be considered) to find in the function body which should
+act as location of modification.}
 
 \item{expr}{Expression or code to puch in}
+
+\item{line_location}{Exact line location (a vector similar to return of
+\code{\link[=locate_section]{locate_section}}. Note this function \code{locate_section}
+is available only in \strong{dynamic attachment}). This is ignored if
+\code{search_str} is present.}
 
 \item{replace_it}{Whether replace it (the match by \code{search_str}) (if \code{TRUE}
 the argument \code{append_after} will be omitted)}
 
 \item{append_after}{Whether add after it (\code{replace_it} should be \code{FALSE})}
 
+\item{move_up_to}{Fine-tuning the locator (should be an index within the
+length of locator). Moving up from found match.}
+
 \item{chop_locator_to}{Fine-tuning the locator (should be an index within the
-length of locator)}
+length of locator). Moving from beginning of found match. \code{move_up_to} is
+better option. It is exactly opposite of \code{move_up_to} (in a sense).}
 
 \item{env}{In case \code{expr} is passed from a different location apart from
-global environment. It may be required if \code{patch_function} is called inside a
-function or in different environment from \code{.GlobalEnv}}
+global environment. It may be required if \code{patch_function} is called inside
+a function or in different environment from \code{.GlobalEnv}}
+
+\item{auto_assign_patched_function}{Whether the patched function to be auto
+patched into it's source. By default \code{FALSE}. Usethis with care.}
 }
 \value{
 Patched \code{function} (if the \code{search_str} is found)
@@ -53,14 +69,15 @@ function, as available in single session of the package, will be kept only
 once)
 
 In case there is a high chance that the target function \code{f} will undergo
-several modifications, then \code{search_str} should be given in a way that match
-happens even if the code changes (to certain degree). The first match will be
-considered for locating purposes.
+several modifications, then \code{search_str} should be given in a way that
+match happens even if the code changes (to certain degree). The first match
+will be considered for locating purposes.
 
-It is sometimes difficult to understand how \code{chop_locator_to} should be
-constructed. In such cases, users may attach optional functions to help them
-understand the locator. Which can be done via simple \code{patch_function()} call.
-Meaning omitting all arguments.
+It is sometimes difficult to understand how \code{move_up_to} or
+\code{chop_locator_to} should be constructed. In such cases, users may attach
+optional functions to help them understand the locator. Which can be done
+via simple \code{patch_function()} call. Meaning omitting all arguments. It is
+referred as \strong{dynamic attachment}.
 
 Note that few sample use-cases are supplied with the package. This may be
 accessed by
@@ -69,9 +86,33 @@ accessed by
 
 However, note that these may cause problem (though it is meant for R-Studio
 actually) with R-Studio. If such things happen kindly restart the session.
-This feature is not checked as a part of package evaluations.
-So \strong{use it at your own risk}.
+This feature is not checked as a part of package evaluations. So \strong{use it
+at your own risk}.
 }
+\section{Types of \emph{patching}}{
+
+
+\code{{patch}} is designed for quick in-session modification to certain type of
+functions. Sometimes it is useful if some experimental feature (or yet to
+implement feature) is required quickly.
+
+There are many ways you can patch a function. But most importantly there is
+a concept of robust patching. The underlying source of the target function
+changes as and when developer releases new version, patches etc. The idea
+is to generate a robust \emph{(so that the patch will mostly work even if there
+is a code change in the function)} patch.
+}
+
+\section{Robust way}{
+
+
+Ideally one should use a \code{search_str} and possibly \code{move_up_to} to fine
+tune the patch. Make sure \code{search_str} is a core item (part of the body of
+target function) which usually will not change (unless there is major
+changes in the underlying code-base) One can use \strong{dynamic attachment} to
+fine tune the \code{move_up_to} numbers (or directly \code{patch_function}).
+}
+
 \examples{
 
 # test function

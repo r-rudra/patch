@@ -3,26 +3,29 @@
 # support for @ and $ may be given
 
 details_of_function <- function(f, env = environment()){
+
+  f_mod <- f
+
   fc <- substitute(f, env = env)
   fc <- as.list(fc)
   fs <- as.character(fc[[1]])
 
   fd <- list()
+  fd$auto_assign_possible <- FALSE
 
   # class
   cls <- switch (fs,
-    `function` = "anonymous_function",
-    `::` = "package_exported",
-    `:::` = "package_internal",
-    `$` = "dollar",
-    `@` = "S4_slot",
-    "unknown"
+                 `function` = "anonymous_function",
+                 `::` = "package_exported",
+                 `:::` = "package_internal",
+                 `$` = "dollar",
+                 `@` = "S4_slot",
+                 "unknown"
   )
 
-  # @ not implemented
+  # @ and $ not implemented
   # TODO
-  if(cls %in% c("S4_slot","dollar")) stop("Not implemented yet!",call. = FALSE)
-
+  # if(cls %in% c("S4_slot","dollar")) stop("Not implemented yet!",call. = FALSE)
 
 
   if(cls == "unknown"){
@@ -33,9 +36,24 @@ details_of_function <- function(f, env = environment()){
     }
   }
 
+  # if it is a package function (and attached)
+  # change to correct form
+  fl_info <- list()
+  if(cls == "function_in_search_path"){
+    fl_info <- locate_object(fs)
+    where_this <- fl_info$name[1]
+    if(grepl("package:",where_this)){
+      fc[[2]] <- gsub("package:","", where_this)
+      fc[[3]] <- fs
+      cls <- "package_exported"
+    }
+  }
+
+
   fd$class <- cls
 
   # assign_back options
+  # TODO
   fd$assign_back <- function(new_body){
     stop("Not implemented yet!", call. = FALSE)
   }
@@ -45,11 +63,27 @@ details_of_function <- function(f, env = environment()){
     package_fn <- as.character(fc[[3]])
 
     fd$assign_back <- function(new_body){
-      redefine_package_object(package_name, package_fn, new_body)
+      body(f_mod) <- new_body
+      redefine_package_object(package_name, package_fn, f_mod)
     }
+
+    fd$auto_assign_possible <- TRUE
 
   }
 
+  if(cls == "function_in_search_path"){
+    # fl_info and where_this should be already defined
+    fd$assign_back <- function(new_body){
+      if(where_this %in% search()){
+        body(f_mod) <- new_body
+        asNamespace("base")[["assign"]](fs, f_mod, pos = where_this)
+      }
+    }
+
+    fd$auto_assign_possible <- TRUE
+  }
+
+  fd
 
 }
 
@@ -79,32 +113,18 @@ redefine_package_object <- function(package_name, object_name, object_new_val){
 }
 
 
-# essentially bad approach
 
-list_objects_store <- new.env()
+locate_object <- function(obj_name){
 
-list_objects <- function(cache_session = Sys.time()){
-  if(!identical(list_objects_store$cache_session, cache_session)){
-    sp <- search()
-    obj_list <- lapply(seq_along(sp), function(sn) ls(pos = sn))
-    list_objects_store$sp <<- sp
-    list_objects_store$obj_list <<- obj_list
-    list_objects_store$cache_session <<- cache_session
-  }
-  invisible(list_objects_store)
-}
+  sp <- search()
 
-locate_object <- function(obj_name, cache_session = Sys.time()){
-
-  lo <- list_objects(cache_session)
-
-  locs <- unlist(lapply(lo$obj_list, function(objs) (obj_name %in% objs)))
+  locs <- unlist(lapply(seq_along(sp), function(sn) exists(obj_name, where = sn, inherits = F)))
 
   res <- list()
 
   res$found <- any(locs)
   res$pos <- which(locs)
-  res$name <- lo$sp[res$pos]
+  res$name <- sp[res$pos]
 
   res
 
