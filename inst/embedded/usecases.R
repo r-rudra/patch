@@ -59,8 +59,13 @@ enable_all <- function() {
           if (!is.null(chainObject)) {
             if (is.data.frame(chainObject)) {
               pline <- gsub(" +", "", line)
-              cname_attempt <- rev(unlist(strsplit(
-                rev(unlist(strsplit(pline, "==")))[1], "\\(|[ ]+|,")))[[1]]
+              cname_attempt <- tryCatch(
+                rev(unlist(strsplit(
+                  rev(strsplit(rev(unlist(strsplit(pline, "==")))[1],
+                               "&|\\|")[[1]])[1],
+                  "\\(|[ ]+|,")))[[1]],
+                error = function(e) ""
+              )
               if (cname_attempt %in% colnames(chainObject)) {
                 # safe limit
                 safe_lim <- getOption("filter_auto_complete_row_limit")
