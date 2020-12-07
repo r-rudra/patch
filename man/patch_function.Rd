@@ -13,6 +13,8 @@ patch_function(
   append_after = TRUE,
   move_up_to = NULL,
   chop_locator_to = NULL,
+  further_locator = integer(0),
+  new_arguments = NULL,
   env = NULL,
   auto_assign_patched_function = FALSE,
   no_store = FALSE
@@ -22,10 +24,11 @@ patch_function(
 \item{f}{Function to modify / patch}
 
 \item{search_str}{String (or strings; in case multiple strings is given only
-first match will be considered) to find in the function body which should
-act as location of modification.}
+first match will be considered. Even for multiple matches of single
+supplied string \strong{only first match} will be considered.) to find in the
+function body which should act as location of modification.}
 
-\item{expr}{Expression or code to puch in}
+\item{expr}{Expression or code to punch in}
 
 \item{line_location}{Exact line location (a vector similar to return of
 \code{\link[=locate_section]{locate_section}}. Note this function \code{locate_section}
@@ -44,12 +47,29 @@ length of locator). Moving up from found match.}
 length of locator). Moving from beginning of found match. \code{move_up_to} is
 better option. It is exactly opposite of \code{move_up_to} (in a sense).}
 
+\item{further_locator}{(Optional) In case you need to further tune \emph{locator}
+by adding few extra locations (or depth) after found match (by
+\code{search_str}) or supplied location (by \code{line_location}). A vector of
+integers (specifying location in nested list form of function body).
+\code{further_locator} is applied before fine tuning by other arguments
+(\code{move_up_to} and \code{chop_locator_to}).}
+
+\item{new_arguments}{(Optional) In case one need to change the arguments of
+the function. Note that it has to be full list of argument. (It should not
+be considered as additional argument). You can use \code{\link[base:list]{alist}}
+for this (\emph{Remember to give \code{=} otherwise it will not work}). Leave it to
+\code{NULL} (default) in case argument alteration is not required.}
+
 \item{env}{In case \code{expr} is passed from a different location apart from
 global environment. It may be required if \code{patch_function} is called inside
 a function or in different environment from \code{.GlobalEnv}}
 
 \item{auto_assign_patched_function}{Whether the patched function to be auto
 patched into it's source. By default \code{FALSE}. Usethis with care.}
+
+\item{no_store}{If set to \code{TRUE}. It will not try to backup the function in
+current session. (Maybe useful for understanding edit locations before
+actual patch work.)}
 }
 \value{
 Patched \code{function} (if the \code{search_str} is found)
@@ -101,16 +121,14 @@ a concept of robust patching. The underlying source of the target function
 changes as and when developer releases new version, patches etc. The idea
 is to generate a robust \emph{(so that the patch will mostly work even if there
 is a code change in the function)} patch.
-}
-
-\section{Robust way}{
-
+\subsection{Robust way:}{
 
 Ideally one should use a \code{search_str} and possibly \code{move_up_to} to fine
 tune the patch. Make sure \code{search_str} is a core item (part of the body of
 target function) which usually will not change (unless there is major
 changes in the underlying code-base) One can use \strong{dynamic attachment} to
 fine tune the \code{move_up_to} numbers (or directly \code{patch_function}).
+}
 }
 
 \examples{

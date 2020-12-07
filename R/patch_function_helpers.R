@@ -126,3 +126,37 @@ store_original_function <- function(f, env = NULL) {
   }
   return(f)
 }
+
+
+# Argument manipulation
+
+modify_args <- function(fn, new_arg = NULL){
+
+  # early exit
+  # do nothing if no new_arg supplied
+  if(is.null(new_arg)) return(fn)
+
+  # this can be used to track unintentional argument changes
+  old_formals <- formals(fn)
+
+  tryCatch(
+    formals(fn) <- new_arg,
+    error = function(e){
+      stop(
+        paste0(
+          "Unable to modify arguments of the function.\n",
+          "Make sure you have used <alist> correctly ",
+          "(e.g. alist(a=, b=), `=` is important).\n",
+          "For quick reference check <formals> help.\n"),
+        call. = FALSE)
+    }
+  )
+
+  if(length(setdiff(names(old_formals), names(formals(fn))))>0){
+    warning(
+      "At least one old argument is missed. Make sure that is intentional.",
+      call. = FALSE
+    )
+  }
+  fn
+}

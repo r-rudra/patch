@@ -54,7 +54,7 @@ details_of_function <- function(f, env = environment()){
 
   # assign_back options
   # TODO
-  fd$assign_back <- function(new_body){
+  fd$assign_back <- function(new_body, new_arg){
     stop("Not implemented yet!", call. = FALSE)
   }
 
@@ -62,8 +62,9 @@ details_of_function <- function(f, env = environment()){
     package_name <- as.character(fc[[2]])
     package_fn <- as.character(fc[[3]])
 
-    fd$assign_back <- function(new_body){
+    fd$assign_back <- function(new_body, new_arg){
       body(f_mod) <- new_body
+      f_mod <- modify_args(f_mod, new_arg)
       redefine_package_object(package_name, package_fn, f_mod)
     }
 
@@ -73,9 +74,10 @@ details_of_function <- function(f, env = environment()){
 
   if(cls == "function_in_search_path"){
     # fl_info and where_this should be already defined
-    fd$assign_back <- function(new_body){
+    fd$assign_back <- function(new_body, new_arg){
       if(where_this %in% search()){
         body(f_mod) <- new_body
+        f_mod <- modify_args(f_mod, new_arg)
         asNamespace("base")[["assign"]](fs, f_mod, pos = where_this)
       }
     }

@@ -9,9 +9,10 @@
 #'
 #' @param f Function to modify / patch
 #' @param search_str String (or strings; in case multiple strings is given only
-#'   first match will be considered) to find in the function body which should
-#'   act as location of modification.
-#' @param expr Expression or code to puch in
+#'   first match will be considered. Even for multiple matches of single
+#'   supplied string **only first match** will be considered.) to find in the
+#'   function body which should act as location of modification.
+#' @param expr Expression or code to punch in
 #' @param line_location Exact line location (a vector similar to return of
 #'   [`locate_section`][locate_section()]. Note this function `locate_section`
 #'   is available only in **dynamic attachment**). This is ignored if
@@ -24,11 +25,25 @@
 #' @param chop_locator_to Fine-tuning the locator (should be an index within the
 #'   length of locator). Moving from beginning of found match. `move_up_to` is
 #'   better option. It is exactly opposite of `move_up_to` (in a sense).
+#' @param further_locator (Optional) In case you need to further tune _locator_
+#'   by adding few extra locations (or depth) after found match (by
+#'   `search_str`) or supplied location (by `line_location`). A vector of
+#'   integers (specifying location in nested list form of function body).
+#'   `further_locator` is applied before fine tuning by other arguments
+#'   (`move_up_to` and `chop_locator_to`).
+#' @param new_arguments (Optional) In case one need to change the arguments of
+#'   the function. Note that it has to be full list of argument. (It should not
+#'   be considered as additional argument). You can use [`alist`][base::alist()]
+#'   for this (_Remember to give `=` otherwise it will not work_). Leave it to
+#'   `NULL` (default) in case argument alteration is not required.
 #' @param env In case `expr` is passed from a different location apart from
 #'   global environment. It may be required if `patch_function` is called inside
 #'   a function or in different environment from `.GlobalEnv`
 #' @param auto_assign_patched_function Whether the patched function to be auto
 #'   patched into it's source. By default `FALSE`. Usethis with care.
+#' @param no_store If set to `TRUE`. It will not try to backup the function in
+#'   current session. (Maybe useful for understanding edit locations before
+#'   actual patch work.)
 #'
 #' @details Backup of the original function is kept in an environment for
 #'   restoration purpose (if required). That can be obtained by calling
@@ -71,7 +86,7 @@
 #'   is to generate a robust _(so that the patch will mostly work even if there
 #'   is a code change in the function)_ patch.
 #'
-#' @section Robust way:
+#'   ### Robust way:
 #'
 #'   Ideally one should use a `search_str` and possibly `move_up_to` to fine
 #'   tune the patch. Make sure `search_str` is a core item (part of the body of
@@ -119,13 +134,16 @@
 #' # multiple candidate for matching locator (first match will be considered)
 #' patch_function(ftest, c("v <- 11","z1 <- 14","u <- 10"),
 #' z1 <- z1 + length(letters), replace_it = TRUE)
-patch_function <- function(f,
-                           search_str, expr, line_location,
-                           replace_it = FALSE, append_after = TRUE,
-                           move_up_to = NULL, chop_locator_to = NULL,
-                           env = NULL,
-                           auto_assign_patched_function = FALSE,
-                           no_store = FALSE){
+patch_function <- function(
+  f,
+  search_str, expr, line_location,
+  replace_it = FALSE, append_after = TRUE,
+  move_up_to = NULL, chop_locator_to = NULL, further_locator = integer(0),
+  new_arguments = NULL,
+  env = NULL,
+  auto_assign_patched_function = FALSE,
+  no_store = FALSE
+){
 
 
   if(missing(f)) {
@@ -139,32 +157,47 @@ patch_function <- function(f,
 
   if(!no_store){
     fs <- store_original_function(f, env = env)
-    if(missing(search_str)){
+    if(missing(search_str) & missing(line_location)){
       # return original function (since session start)
       if(auto_assign_patched_function){
-        auto_assign(f, body(fs), env)
-        # early exit without printing
+        auto_assign(f,
+                    new_f_body = body(fs),
+                    new_f_arg = formals(fs),
+                    env)
+        # exit without printing
         return(invisible(fs))
       }else{
+        # exit with printing
         return(fs)
       }
     }
   }
 
   fbody <- body(f)
-  # match first occurrence
-  if(length(search_str)>1){
-    for(ss in search_str){
-      tloc <- locate_section(fbody, ss)
-      if(length(tloc)>0) break()
+
+  if(!missing(search_str)){
+    if(length(search_str)>1){
+      # match first occurrence
+      for(ss in search_str){
+        tloc <- locate_section(fbody, ss)
+        if(length(tloc)>0) break()
+      }
+    }else{
+      tloc <- locate_section(fbody, search_str)
     }
   }else{
-    tloc <- locate_section(fbody, search_str)
+    tloc <- line_location
   }
 
+  # add further locator at the end
+  tloc <- c(tloc, further_locator)
+
   if(length(tloc)==0){
-    stop("Unable to find supplied string(s) in the body of the target function."
-         , call. = FALSE)
+    stop(
+      paste0(
+        "Unable to find supplied string(s) ",
+        "in the body of the target function (or invalid locator)."),
+      call. = FALSE)
   }
 
   # move_up_to = length(tloc)-chop_locator_to+1
@@ -187,12 +220,15 @@ patch_function <- function(f,
   }
 
   if(auto_assign_patched_function){
-    auto_assign(f, fbody_new, env)
+    auto_assign(f,
+                new_f_body = fbody_new,
+                new_f_arg = new_arguments, env)
     # early exit without printing
     return(invisible(f))
   }
 
   body(f) <- fbody_new
+  f <- modify_args(f, new_arguments)
   f
 }
 
