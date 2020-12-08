@@ -10,16 +10,33 @@
 #' @param f Function to modify / patch
 #' @param search_str String (or strings; in case multiple strings is given only
 #'   first match will be considered. Even for multiple matches of single
-#'   supplied string **only first match** will be considered.) to find in the
+#'   supplied string **only first match** will be considered unless
+#'   `which_match_to_target` is not supplied or more than `1`.) to find in the
 #'   function body which should act as location of modification.
-#' @param expr Expression or code to punch in
+#' @param expr Expression or code to punch in. If user don't supply this it will
+#'   be assumed that (replace_it = TRUE , append_after = FALSE) and the browser
+#'   on error will be used. This option is good for debugging the functions.
+#' @param modification_placement This is to control the placment of modification
+#'   (supplied by `expr`) relative to found match (by `search_str` or
+#'   `line_location`). It can be ignored if user want to control modification
+#'   placement (using `replace_it` and `append_after`). If not missed it has to
+#'   be one of `c("after","replace","before")` _(Easy to understand what each
+#'   options meant)_. If supplied further inputs to arguments `append_after` and
+#'   `replace_it` will be ignored.
+#' @param which_match_to_target If there is multiple match by `search_str` then
+#'   which one to target (number should be sequential appearance of `search_str`
+#'   in function body). If missed or `1` only first match will be considered.
+#'   _Note: `which_match_to_target` is supposed to be single integer and is
+#'   designed for single entry of `search_str`. For multiple entry in
+#'   `search_str` it's better not to use this feature._
 #' @param line_location Exact line location (a vector similar to return of
 #'   [`locate_section`][locate_section()]. Note this function `locate_section`
 #'   is available only in **dynamic attachment**). This is ignored if
-#'   `search_str` is present.
+#'   `search_str` is present. _(This is non-robust way of editing)_
 #' @param replace_it Whether replace it (the match by `search_str`) (if `TRUE`
 #'   the argument `append_after` will be omitted)
-#' @param append_after Whether add after it (`replace_it` should be `FALSE`)
+#' @param append_after Whether add after it (`replace_it` should be `FALSE`). If
+#'   set to `FALSE`, the modification will be added before the found match.
 #' @param move_up_to Fine-tuning the locator (should be an index within the
 #'   length of locator). Moving up from found match.
 #' @param chop_locator_to Fine-tuning the locator (should be an index within the
@@ -44,6 +61,9 @@
 #' @param no_store If set to `TRUE`. It will not try to backup the function in
 #'   current session. (Maybe useful for understanding edit locations before
 #'   actual patch work.)
+#' @param auto_add_curly_brackets If `TRUE` adds `{}` to single line functions.
+#'   This enables further editing of single functions. _Note: after edit it will
+#'   be no more single line._
 #'
 #' @details Backup of the original function is kept in an environment for
 #'   restoration purpose (if required). That can be obtained by calling
@@ -136,15 +156,50 @@
 #' z1 <- z1 + length(letters), replace_it = TRUE)
 patch_function <- function(
   f,
-  search_str, expr, line_location,
+  search_str, expr,
+  modification_placement,
+  which_match_to_target,
+  line_location,
   replace_it = FALSE, append_after = TRUE,
   move_up_to = NULL, chop_locator_to = NULL, further_locator = integer(0),
   new_arguments = NULL,
   env = NULL,
   auto_assign_patched_function = FALSE,
-  no_store = FALSE
+  no_store = FALSE,
+  auto_add_curly_brackets = TRUE
 ){
 
+  # modification_placement is either of c("after","replace","before") (if
+  # supplied)
+  if(!missing(modification_placement)){
+    modification_placement <-
+      match.arg(modification_placement,
+                choices = c("after","replace","before"))
+
+    if(modification_placement == "after") {
+      append_after <- TRUE
+      replace_it <- FALSE
+    }
+
+    if(modification_placement == "replace") {
+      append_after <- FALSE
+      replace_it <- TRUE
+    }
+
+    if(modification_placement == "before") {
+      append_after <- FALSE
+      replace_it <- FALSE
+    }
+
+  }
+
+  if(missing(expr)){
+    add_browser_here <- TRUE
+    replace_it <- TRUE
+    append_after <- FALSE
+  }else{
+    add_browser_here <- FALSE
+  }
 
   if(missing(f)) {
     dynamic_attachment()
@@ -175,15 +230,43 @@ patch_function <- function(
 
   fbody <- body(f)
 
+  if(as.character(as.list(fbody)[[1]])!="{"){
+    if(auto_add_curly_brackets){
+      empty.bd <- body(function(){})
+      empty.bd[[2]] <- fbody
+      fbody <- empty.bd
+    }
+  }
+
+  if(is.null(fbody)){
+    if(is.primitive(f)){
+      cat("\nSupplied function is a primitive.\n")
+    }
+    stop("This function can not be modified directly.")
+  }
+
+  # default option
+  locate_section_fn <- locate_section
+
+  if(!missing(which_match_to_target)){
+    which_match_to_target <- as.integer(which_match_to_target)
+    if(which_match_to_target>1){
+      locate_section_fn <- function(fbody, str){
+        rawl <- locate_section_rec(fbody, str)
+        rawl[[min(which_match_to_target, length(rawl))]]
+      }
+    }
+  }
+
   if(!missing(search_str)){
     if(length(search_str)>1){
       # match first occurrence
       for(ss in search_str){
-        tloc <- locate_section(fbody, ss)
+        tloc <- locate_section_fn(fbody, ss)
         if(length(tloc)>0) break()
       }
     }else{
-      tloc <- locate_section(fbody, search_str)
+      tloc <- locate_section_fn(fbody, search_str)
     }
   }else{
     tloc <- line_location
@@ -213,7 +296,8 @@ patch_function <- function(
 
 
   if(replace_it){
-    fbody_new <- replace_in_section(fbody, tloc, expr, env = env)
+    fbody_new <- replace_in_section(fbody, tloc, expr, env = env,
+                                    add_browser = add_browser_here)
   }else{
     fbody_new <- append_in_section(fbody, tloc, expr, env = env,
                                    after = append_after)

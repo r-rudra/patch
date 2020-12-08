@@ -181,7 +181,7 @@ enable_all <- function() {
 if (exists(".rs.addFunction")) {
   enable_all()
 } else {
-  cat("\nThese are meant for R-Studio\n")
+  cat("\nThese are designed for R-Studio\n")
 }
 
 rm(enable_all)

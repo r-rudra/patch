@@ -18,6 +18,10 @@ Language object
 \description{
 See a section of a function (for development of patch)
 }
+\details{
+There is additional argument \code{search_str} which is available only if
+attached dynamically). This can be given directly omitting \code{tloc}.
+}
 \examples{
 # this only happens if user attached optional functions dynamically
 if (exists("locate_section") & exists("get_section")) {

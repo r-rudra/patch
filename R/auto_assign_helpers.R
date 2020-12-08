@@ -78,7 +78,15 @@ details_of_function <- function(f, env = environment()){
       if(where_this %in% search()){
         body(f_mod) <- new_body
         f_mod <- modify_args(f_mod, new_arg)
-        asNamespace("base")[["assign"]](fs, f_mod, pos = where_this)
+        tryCatch(
+          assign(fs, f_mod, pos = where_this),
+          error = function(e){
+            # mostly it is locked
+            unlockBinding(fs, as.environment(where_this))
+            assign(fs, f_mod, pos = where_this)
+            lockBinding(fs, as.environment(where_this))
+          }
+        )
       }
     }
 

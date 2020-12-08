@@ -1,11 +1,18 @@
 
 dynamic_attachment_env <- new.env()
 
-dynamic_attachment_env$locate_section <- function(f, search_str) {
-  locate_section(body(f), search_str)
+dynamic_attachment_env$locate_section <- function(f, search_str, all = FALSE) {
+  if(all){
+    locate_section_rec(body(f), search_str)
+  }else{
+    locate_section(body(f), search_str)
+  }
 }
 
-dynamic_attachment_env$get_section <- function(f, tloc) {
+dynamic_attachment_env$get_section <- function(f, tloc, search_str) {
+  if(missing(tloc)){
+    tloc <- locate_section(body(f), search_str)
+  }
   get_section(body(f), tloc)
 }
 
@@ -35,6 +42,9 @@ dynamic_attachment <- function(what_to_add = NULL, toggle = TRUE) {
     # asNamespace("base")[["attach"]](dynamic_attachment_env, pos = 2L, name = dynamic_attachment_name, warn.conflicts = FALSE)
 
     base::attach(dynamic_attachment_env, pos = 2L, name = dynamic_attachment_name, warn.conflicts = FALSE)
+
+    # lock it
+    lockEnvironment(as.environment(2L), bindings = TRUE)
 
     cat(
       "\nNote:",

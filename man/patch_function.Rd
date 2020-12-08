@@ -8,6 +8,8 @@ patch_function(
   f,
   search_str,
   expr,
+  modification_placement,
+  which_match_to_target,
   line_location,
   replace_it = FALSE,
   append_after = TRUE,
@@ -17,7 +19,8 @@ patch_function(
   new_arguments = NULL,
   env = NULL,
   auto_assign_patched_function = FALSE,
-  no_store = FALSE
+  no_store = FALSE,
+  auto_add_curly_brackets = TRUE
 )
 }
 \arguments{
@@ -25,20 +28,39 @@ patch_function(
 
 \item{search_str}{String (or strings; in case multiple strings is given only
 first match will be considered. Even for multiple matches of single
-supplied string \strong{only first match} will be considered.) to find in the
+supplied string \strong{only first match} will be considered unless
+\code{which_match_to_target} is not supplied or more than \code{1}.) to find in the
 function body which should act as location of modification.}
 
-\item{expr}{Expression or code to punch in}
+\item{expr}{Expression or code to punch in. If user don't supply this it will
+be assumed that (replace_it = TRUE , append_after = FALSE) and the browser
+on error will be used. This option is good for debugging the functions.}
+
+\item{modification_placement}{This is to control the placment of modification
+(supplied by \code{expr}) relative to found match (by \code{search_str} or
+\code{line_location}). It can be ignored if user want to control modification
+placement (using \code{replace_it} and \code{append_after}). If not missed it has to
+be one of \code{c("after","replace","before")} \emph{(Easy to understand what each
+options meant)}. If supplied further inputs to arguments \code{append_after} and
+\code{replace_it} will be ignored.}
+
+\item{which_match_to_target}{If there is multiple match by \code{search_str} then
+which one to target (number should be sequential appearance of \code{search_str}
+in function body). If missed or \code{1} only first match will be considered.
+\emph{Note: \code{which_match_to_target} is supposed to be single integer and is
+designed for single entry of \code{search_str}. For multiple entry in
+\code{search_str} it's better not to use this feature.}}
 
 \item{line_location}{Exact line location (a vector similar to return of
 \code{\link[=locate_section]{locate_section}}. Note this function \code{locate_section}
 is available only in \strong{dynamic attachment}). This is ignored if
-\code{search_str} is present.}
+\code{search_str} is present. \emph{(This is non-robust way of editing)}}
 
 \item{replace_it}{Whether replace it (the match by \code{search_str}) (if \code{TRUE}
 the argument \code{append_after} will be omitted)}
 
-\item{append_after}{Whether add after it (\code{replace_it} should be \code{FALSE})}
+\item{append_after}{Whether add after it (\code{replace_it} should be \code{FALSE}). If
+set to \code{FALSE}, the modification will be added before the found match.}
 
 \item{move_up_to}{Fine-tuning the locator (should be an index within the
 length of locator). Moving up from found match.}
@@ -70,6 +92,10 @@ patched into it's source. By default \code{FALSE}. Usethis with care.}
 \item{no_store}{If set to \code{TRUE}. It will not try to backup the function in
 current session. (Maybe useful for understanding edit locations before
 actual patch work.)}
+
+\item{auto_add_curly_brackets}{If \code{TRUE} adds \code{{}} to single line functions.
+This enables further editing of single functions. \emph{Note: after edit it will
+be no more single line.}}
 }
 \value{
 Patched \code{function} (if the \code{search_str} is found)

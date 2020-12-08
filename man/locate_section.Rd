@@ -17,6 +17,11 @@ Recursive list path (if match found) for function body
 \description{
 Locate a section of a function
 }
+\details{
+There is additional argument \code{all} which is available only if
+attached dynamically). If set to \code{TRUE} it will list all matches in a list
+(otherwise only first match)
+}
 \examples{
 # this only happens if user attached optional functions dynamically
 if (exists("locate_section") & exists("get_section")) {

@@ -4,6 +4,10 @@
 #' @param fbody Body of a function / (function directly if attached dynamically)
 #' @param search_str The string(s) to find in the body
 #'
+#' @details There is additional argument `all` which is available only if
+#'   attached dynamically). If set to `TRUE` it will list all matches in a list
+#'   (otherwise only first match)
+#'
 #' @return Recursive list path (if match found) for function body
 #' @keywords internal
 #' @seealso [`get_section`][get_section()]
@@ -30,11 +34,38 @@ locate_section <- function(fbody, search_str) {
   tloc
 }
 
+
+# recursive version with full scan (not only first match)
+locate_section_rec <- function(fbody, search_str, pre = integer(0)) {
+  tloc <- list()
+  rlocs <- grepl(search_str, as.character(fbody))
+  if(any(rlocs)){
+    if(length(fbody)>1){
+      tl0 <- seq_along(rlocs)[rlocs]
+      tl1 <- lapply(tl0, function(x) c(pre, x))
+      tl2 <- lapply(
+        seq_along(tl0),
+        function(i){
+          locate_section_rec(fbody[[tl0[i]]], search_str, pre = tl1[[i]])
+        })
+      tl3 <- Reduce(c, tl2)
+      tloc <- tl3
+    }else{
+      tloc <- list(c(pre, which(rlocs)))
+    }
+  }
+  tloc
+}
+
+
 #' See a section of a function (for development of patch)
 #'
 #' @param fbody Body of a function / (function directly if attached dynamically)
 #' @param tloc Recursive list path as returned by
 #' [`locate_section`][locate_section()] or hand typed
+#'
+#' @details There is additional argument `search_str` which is available only if
+#'   attached dynamically). This can be given directly omitting `tloc`.
 #'
 #' @return Language object
 #' @keywords internal
@@ -48,12 +79,18 @@ locate_section <- function(fbody, search_str) {
 get_section <- function(fbody, tloc) {
   obj <- NULL
   if (length(tloc) > 0) {
-    obj <- eval(parse(text = paste0("fbody", paste0("[[", tloc, "]]", collapse = ""))))
+    obj <- eval(
+      parse(
+        text =
+          paste0("fbody", paste0("[[", tloc, "]]", collapse = ""))
+      )
+    )
   }
   obj
 }
 
-replace_in_section <- function(fbody, tloc, expr, env = NULL) {
+replace_in_section <- function(fbody, tloc, expr, env = NULL,
+                               add_browser = FALSE) {
   fbody_mod <- fbody
   if (length(tloc) > 0) {
     if (is.null(env)) {
@@ -61,9 +98,31 @@ replace_in_section <- function(fbody, tloc, expr, env = NULL) {
     } else {
       env_str <- ", env = env)"
     }
-    eval(parse(text = paste0(
-      paste0("fbody_mod", paste0("[[", tloc, "]]", collapse = "")), " <- ", "substitute(expr", env_str
-    )))
+    if(add_browser){
+
+      code <-
+        paste0(".tmpNode <- ",
+               paste0("fbody_mod", paste0("[[", tloc, "]]", collapse = "")),
+               "\n",
+
+               paste0("fbody_mod", paste0("[[", tloc, "]]", collapse = "")),
+               " <- substitute(tryCatch('', error = function(e) browser()))\n",
+
+               paste0("fbody_mod", paste0("[[", tloc, "]]", collapse = "")),
+               "[[2]] <- .tmpNode")
+
+      eval(parse(text = code))
+    }else{
+      eval(
+        parse(
+          text =
+            paste0(
+              paste0("fbody_mod", paste0("[[", tloc, "]]", collapse = "")),
+              " <- ", "substitute(expr", env_str
+            )
+        )
+      )
+    }
   }
   fbody_mod
 }
@@ -85,16 +144,21 @@ append_in_section <- function(fbody, tloc, expr, env = NULL, after = TRUE) {
       taget_brackets <- ""
     }
 
-    eval(
-      parse(
-        text = paste0(
-          "fbm_part <- ", paste0("fbody_mod", taget_brackets), "\n",
-          "fbm_part <- fbm_part[c(", paste0(c(1:tloc[length(tloc)], tloc[length(tloc)]), collapse = ","), ":length(fbm_part))]", "\n",
-          paste0("fbm_part[[", ifelse(after, tloc[length(tloc)] + 1, tloc[length(tloc)]), "]]"), " <- ", "substitute(expr", env_str, "\n",
-          "fbm_part -> ", paste0("fbody_mod", taget_brackets)
-        )
-      )
+    code <-  paste0(
+      "fbm_part <- ", paste0("fbody_mod", taget_brackets), "\n",
+
+      "fbm_part <- fbm_part[c(",
+      paste0(c(1:tloc[length(tloc)], tloc[length(tloc)]), collapse = ","),
+      ":length(fbm_part))]", "\n",
+
+      paste0("fbm_part[[",
+             ifelse(after, tloc[length(tloc)] + 1, tloc[length(tloc)]), "]]"),
+      " <- ", "substitute(expr", env_str, "\n",
+
+      "fbm_part -> ", paste0("fbody_mod", taget_brackets)
     )
+
+    eval(parse(text = code))
   }
   fbody_mod
 }
