@@ -56,6 +56,11 @@ test_that("intermediate features works", {
     }
   }
 
+  f002 <- patch_function(f02, "here", which_match_to_target = 2)
+
+  expect_equal(as.character(body(f002)[[3]][[3]][[2]]),
+               c("tryCatch", "here", "function(e) browser()"))
+
   expect_equal(
     patch_function(f02, "here","there",
                    which_match_to_target = 2,
@@ -83,10 +88,6 @@ test_that("intermediate features works", {
 
   patch_function(f02, auto_assign_patched_function = TRUE)
 
-  f2 <- patch_function_raw(f02, "here", "there",
-                       which_match_to_target = 2, safely = TRUE,
-                       modification_placement = "replace", move_up_to = 2)
-
   f2 <- patch_function(f02, "here", "there",
                        which_match_to_target = 2, safely = TRUE,
                        modification_placement = "replace", move_up_to = 2)
@@ -103,8 +104,8 @@ test_that("intermediate features works", {
   expect_failure(expect_message(f2()))
 
   f3 <- patch_function(f02, "here",log("hi"),
-                           which_match_to_target = 2,
-                           safely = TRUE, move_up_to = 2)
+                       which_match_to_target = 2,
+                       safely = TRUE, move_up_to = 2)
 
   expect_failure(expect_error(f3()))
 
@@ -114,4 +115,42 @@ test_that("intermediate features works", {
 
 
 })
+
+
+test_that("pkg replacement works", {
+
+  options(store_function_before_patch = TRUE)
+  expect_warning(nr <- patch_function(rbinom, "size", 10,
+                                      new_arguments = alist(n=10, prob = 0.5),
+                                      modification_placement = "replace"),
+                 "is missed")
+
+  rs <- round(runif(1)*100)
+  set.seed(rs)
+  res1 <- nr()
+
+  set.seed(rs)
+  res2 <- rbinom(10, 10, 0.5)
+
+  expect_equal(res1, res2)
+
+  # expect_error(rbinom(),"is missing, with no default")
+
+  patch_function(rbinom,
+                 new_arguments = alist(n=10, prob = 0.5),
+                 auto_assign_patched_function = TRUE)
+  expect_failure(expect_error(rbinom(size = 10),"is missing, with no default"))
+
+  # reset
+  patch_function(rbinom,
+                 auto_assign_patched_function = TRUE)
+
+  expect_error(rbinom(size = 10),"is missing, with no default")
+
+
+  expect_equal(get_f_well_name(utils::choose.files),
+               "from_p_utils_choose.files")
+
+})
+
 

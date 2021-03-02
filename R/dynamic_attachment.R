@@ -50,7 +50,7 @@ dynamic_attachment <- function(what_to_add = NULL, toggle = TRUE) {
       "\nNote:",
       "locate_section and get_section added to the search path (visible to",
       "you) \n(modified to work directly on function instead of the body)",
-      "\nIt will be automatically cleared when you unload or dettach main ",
+      "\nIt will be automatically cleared when you unload or dettach main",
       "package. \nYou can manually clear it also by calling <me> again.",
       "\n"
     )

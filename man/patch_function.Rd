@@ -18,6 +18,7 @@ patch_function(
   chop_locator_to = NULL,
   further_locator = integer(0),
   new_arguments = NULL,
+  new_arguments_integrate = TRUE,
   env = NULL,
   auto_assign_patched_function = FALSE,
   no_store = !isTRUE(getOption("store_function_before_patch")),
@@ -87,6 +88,12 @@ the function. Note that it has to be full list of argument. (It should not
 be considered as additional argument). You can use \code{\link[base:list]{alist}}
 for this (\emph{Remember to give \code{=} otherwise it will not work}). Leave it to
 \code{NULL} (default) in case argument alteration is not required.}
+
+\item{new_arguments_integrate}{If set to \code{FALSE} (by default it is \code{TRUE})
+then new argument will be passed as it is (replacement of complete
+argument). Otherwise, it will be integrated (or merged) with arguments
+which are used in the body of function directly after the modifications.
+Note: In case few argument is missed warning will be issued accordingly.}
 
 \item{env}{In case \code{expr} is passed from a different location apart from
 global environment. It may be required if \code{patch_function} is called inside

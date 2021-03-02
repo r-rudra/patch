@@ -248,16 +248,18 @@ patch_function_raw <- function(
     env <- environment()
   }
 
+
   if(missing(search_str) & missing(line_location) & missing(new_arguments)){
     # no modification requested
-    if(!no_store){
+    chk <- store_original_function(f, env = env, check_only = TRUE)
+    if(!no_store | isTRUE(chk)){
       fs <- store_original_function(f, env = env)
-
       # return original function (since session start)
       if(auto_assign_patched_function){
         auto_assign(f,
                     new_f_body = body(fs),
                     new_f_arg = formals(fs),
+                    new_f_arg_integrate = FALSE,
                     env)
         # exit without printing
         return(invisible(fs))
@@ -265,10 +267,15 @@ patch_function_raw <- function(
         # exit with printing
         return(fs)
       }
-    }else{
-      cat("\nNothing to do here!\n")
-      return(invisible(f))
     }
+
+    cat("\nNothing to do here!\n")
+    return(invisible(f))
+  }
+
+
+  if(!no_store){
+    store_original_function(f, env = env)
   }
 
 

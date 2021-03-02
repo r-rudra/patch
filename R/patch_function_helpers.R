@@ -257,11 +257,16 @@ get_f_well_name <- function(f, env = environment()){
   fn
 }
 
-store_original_function <- function(f, env = NULL) {
+store_original_function <- function(f, env = NULL, check_only = FALSE) {
 
   fn <- get_f_well_name(f, env)
 
-  if (is.null(pre_patch_function_store[[fn]])) {
+  chk<- is.null(pre_patch_function_store[[fn]])
+  if(check_only){
+    return(!chk)
+  }
+
+  if (chk) {
     assign(fn, f, envir = pre_patch_function_store)
   } else {
     return(get(fn, envir = pre_patch_function_store))

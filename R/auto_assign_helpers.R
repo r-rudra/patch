@@ -91,7 +91,7 @@ details_of_function <- function(f, env = environment()){
           assign(fs, f_mod, pos = where_this),
           error = function(e){
             # mostly it is locked
-            unlockBinding(fs, as.environment(where_this))
+            base::unlockBinding(fs, as.environment(where_this))
             assign(fs, f_mod, pos = where_this)
             lockBinding(fs, as.environment(where_this))
           }
@@ -111,7 +111,7 @@ details_of_function <- function(f, env = environment()){
         assign(fs, f_mod, envir = sys_fr_target),
         error = function(e){
           # mostly it is locked
-          unlockBinding(fs, sys_fr_target)
+          base::unlockBinding(fs, sys_fr_target)
           assign(fs, f_mod, envir = sys_fr_target)
           lockBinding(fs, sys_fr_target)
         }
@@ -129,25 +129,38 @@ details_of_function <- function(f, env = environment()){
 
 redefine_package_object <- function(package_name, object_name, object_new_val){
 
-  ._set_this <- function(x, val){
-    utils::assignInMyNamespace(x, val)
-  }
 
   p_env <- asNamespace(package_name)
-
-  environment(._set_this) <- p_env
 
   all_names <- ls(envir = p_env, all.names = TRUE)
 
   if(object_name %in% all_names){
+    ._set_this <- function(x, val){
+      utils::assignInMyNamespace(x, val)
+    }
+
+    environment(._set_this) <- p_env
+
+    # this will solve package_name::object_name calls (or ::: calls)
     ._set_this(object_name,object_new_val)
+    rm(._set_this)
+
+    # for attached packages one more step is required
+    psn <- paste0("package:", package_name)
+
+    if(psn %in% search()){
+      pos <- which(search()==psn)
+      tryCatch({
+        detach(psn, character.only = TRUE, force = TRUE)
+        base::attach(p_env, name = psn, pos = pos, warn.conflicts = FALSE)
+      }, error = function(e) NULL)
+    }
+
   }else{
     stop(paste0("Function/object named ", object_name,
                 " not present in {",package_name,"}"),
          call. = FALSE)
   }
-
-  rm(._set_this)
 
   invisible(0)
 }
