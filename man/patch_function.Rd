@@ -13,13 +13,14 @@ patch_function(
   line_location,
   replace_it = FALSE,
   append_after = TRUE,
+  safely = FALSE,
   move_up_to = NULL,
   chop_locator_to = NULL,
   further_locator = integer(0),
   new_arguments = NULL,
   env = NULL,
   auto_assign_patched_function = FALSE,
-  no_store = FALSE,
+  no_store = !isTRUE(getOption("store_function_before_patch")),
   auto_add_curly_brackets = TRUE
 )
 }
@@ -62,6 +63,11 @@ the argument \code{append_after} will be omitted)}
 \item{append_after}{Whether add after it (\code{replace_it} should be \code{FALSE}). If
 set to \code{FALSE}, the modification will be added before the found match.}
 
+\item{safely}{If set to \code{TRUE} the modification expression (\code{expr}) will be
+wrapped inside \code{suppressMessages(suppressWarnings(tryCatch(..)))}. This
+maybe useful if one is not sure how the modification will behave in unknown
+situations.}
+
 \item{move_up_to}{Fine-tuning the locator (should be an index within the
 length of locator). Moving up from found match.}
 
@@ -91,7 +97,10 @@ patched into it's source. By default \code{FALSE}. Usethis with care.}
 
 \item{no_store}{If set to \code{TRUE}. It will not try to backup the function in
 current session. (Maybe useful for understanding edit locations before
-actual patch work.)}
+actual patch work.). By default is \code{TRUE}. It can be configured like
+\code{options(store_function_before_patch = TRUE)}. \strong{Note: The storing and
+restoring mechanism is simply achieved by function names (with minor
+modifications if required).}}
 
 \item{auto_add_curly_brackets}{If \code{TRUE} adds \code{{}} to single line functions.
 This enables further editing of single functions. \emph{Note: after edit it will

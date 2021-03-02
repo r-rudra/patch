@@ -1,7 +1,7 @@
 
 
 # this shows few sample use-cases
-library(patch)
+# library(patch)
 
 # credit goes to creators of RStudio
 # Check this https://github.com/rstudio/rstudio/blob/efc873ed38a738be9dc0612d70f21f59bfd58410/src/cpp/session/modules/SessionRCompletions.R
@@ -13,7 +13,7 @@ enable_all <- function() {
   auto_complete_future_plan <- function() {
     .rs.addJsonRpcHandler(
       "get_completions",
-      patch_function(.rs.rpc.get_completions,
+      patch::patch_function(.rs.rpc.get_completions,
                      ".rs.getCompletionsEnvironmentVariables",
         # addition portion
         if (length(string) &&
@@ -38,7 +38,8 @@ enable_all <- function() {
             type = .rs.acCompletionTypes$VECTOR
           ))
         },
-        chop_locator_to = 1
+        chop_locator_to = 1,
+        safely = TRUE
       )
     )
   }
@@ -46,7 +47,7 @@ enable_all <- function() {
   auto_complete_dplyr_filter <- function() {
     .rs.addJsonRpcHandler(
       "get_completions",
-      patch_function(.rs.rpc.get_completions,
+      patch::patch_function(.rs.rpc.get_completions,
                      ".rs.getCompletionsEnvironmentVariables",
 
         # addition portion
@@ -99,7 +100,8 @@ enable_all <- function() {
             }
           }
         },
-        chop_locator_to = 1
+        chop_locator_to = 1,
+        safely = TRUE
       )
     )
   }
@@ -107,7 +109,7 @@ enable_all <- function() {
   auto_complete_matchArg_functionArgs <- function() {
     .rs.addFunction(
       "getCompletionsArgument",
-      patch_function(.rs.getCompletionsArgument,
+      patch::patch_function(.rs.getCompletionsArgument,
         '"knitr"',
         {
           # one has to add {} in such cases
@@ -152,7 +154,8 @@ enable_all <- function() {
             ))
           }
         },
-        chop_locator_to = 1
+        chop_locator_to = 1,
+        safely = TRUE
       )
     )
   }
@@ -162,12 +165,12 @@ enable_all <- function() {
     # reset
     .rs.addJsonRpcHandler(
       "get_completions",
-      patch_function(.rs.rpc.get_completions)
+      patch::patch_function(.rs.rpc.get_completions)
     )
 
     .rs.addFunction(
       "getCompletionsArgument",
-      patch_function(.rs.getCompletionsArgument)
+      patch::patch_function(.rs.getCompletionsArgument)
     )
   }
 

@@ -58,6 +58,22 @@ locate_section_rec <- function(fbody, search_str, pre = integer(0)) {
 }
 
 
+prune_line_location_locator <- function(fbody, tloc){
+  tf <-tloc[-length(tloc)]
+  tf_pre <- tloc
+  repeat{
+    if(identical(get_section(fbody, tf),get_section(fbody, tloc))){
+      tf_pre <- tf
+      tf <- tf[-length(tf)]
+    }else{
+      break()
+    }
+  }
+  tf_pre
+}
+
+
+
 #' See a section of a function (for development of patch)
 #'
 #' @param fbody Body of a function / (function directly if attached dynamically)
@@ -90,7 +106,7 @@ get_section <- function(fbody, tloc) {
 }
 
 replace_in_section <- function(fbody, tloc, expr, env = NULL,
-                               add_browser = FALSE) {
+                               add_browser = FALSE, replace_safely = FALSE) {
   fbody_mod <- fbody
   if (length(tloc) > 0) {
     if (is.null(env)) {
@@ -100,34 +116,71 @@ replace_in_section <- function(fbody, tloc, expr, env = NULL,
     }
     if(add_browser){
 
-      code <-
-        paste0(".tmpNode <- ",
-               paste0("fbody_mod", paste0("[[", tloc, "]]", collapse = "")),
-               "\n",
+      # kept for testing
+      fbody_mod_loc <- fbody_mod
 
-               paste0("fbody_mod", paste0("[[", tloc, "]]", collapse = "")),
-               " <- substitute(tryCatch('', error = function(e) browser()))\n",
+      code_n_chk <- function(test = FALSE){
+        fbn <- "fbody_mod"
+        if(test){
+          fbn <- "fbody_mod_loc"
+        }
+        code <-
+          paste0(".tmpNode <- ",
+                 paste0(fbn, paste0("[[", tloc, "]]", collapse = "")),
+                 "\n",
 
-               paste0("fbody_mod", paste0("[[", tloc, "]]", collapse = "")),
-               "[[2]] <- .tmpNode")
+                 paste0(fbn, paste0("[[", tloc, "]]", collapse = "")),
+                 " <- substitute(tryCatch('', error = function(e) browser()))\n",
 
-      eval(parse(text = code))
+                 paste0(fbn, paste0("[[", tloc, "]]", collapse = "")),
+                 "[[2]] <- .tmpNode")
+
+        if(test){
+          echk <- tryCatch(eval(parse(text = code)), error = function(e) {e})
+        }else{
+          echk <- TRUE
+        }
+
+        list(code = code, echk = echk)
+      }
+
+      raw <- code_n_chk(test = TRUE)
+
+      if(inherits(raw$echk,"error")){
+        # try by pruning locator
+        tloc <- prune_line_location_locator(fbody,tloc)
+      }
+      # possible pruning
+
+      prn <- code_n_chk()
+      code <- prn$code
+
     }else{
-      eval(
-        parse(
-          text =
-            paste0(
-              paste0("fbody_mod", paste0("[[", tloc, "]]", collapse = "")),
-              " <- ", "substitute(expr", env_str
-            )
+      if(replace_safely){
+        code <-
+          paste0(
+            paste0("tmp <- substitute(suppressMessages(suppressWarnings(",
+                   "tryCatch('this', error = function(e) invisible(NULL)))))"),
+            paste0("\ntmp[[2]][[2]][[2]] <- ", "substitute(expr", env_str, "\n"),
+            paste0("fbody_mod", paste0("[[", tloc, "]]", collapse = "")),
+            " <- tmp", "\n")
+
+      }else{
+        code <- paste0(
+          paste0("fbody_mod", paste0("[[", tloc, "]]", collapse = "")),
+          " <- ", "substitute(expr", env_str
         )
-      )
+      }
+
     }
+
+    eval(parse(text = code))
   }
   fbody_mod
 }
 
-append_in_section <- function(fbody, tloc, expr, env = NULL, after = TRUE) {
+append_in_section <- function(fbody, tloc, expr, env = NULL, after = TRUE,
+                              add_safely = FALSE) {
   fbody_mod <- fbody
 
   if (length(tloc) > 0) {
@@ -144,19 +197,44 @@ append_in_section <- function(fbody, tloc, expr, env = NULL, after = TRUE) {
       taget_brackets <- ""
     }
 
-    code <-  paste0(
-      "fbm_part <- ", paste0("fbody_mod", taget_brackets), "\n",
 
-      "fbm_part <- fbm_part[c(",
-      paste0(c(1:tloc[length(tloc)], tloc[length(tloc)]), collapse = ","),
-      ":length(fbm_part))]", "\n",
+    code <- paste0(
+      "fbm_part <- ", paste0("fbody_mod", taget_brackets), "\n")
+    code <-
+      paste0(
+        code,
+        "fbm_part <- fbm_part[c(",
+        paste0(c(1:tloc[length(tloc)], tloc[length(tloc)]), collapse = ","),
+        ":length(fbm_part))]", "\n")
 
-      paste0("fbm_part[[",
-             ifelse(after, tloc[length(tloc)] + 1, tloc[length(tloc)]), "]]"),
-      " <- ", "substitute(expr", env_str, "\n",
+    if(add_safely){
+      code <-
+        paste0(
+          code,
+          # #--->> simple `tryCatch` (kept just for ref)
+          # paste0("tmp <- substitute(tryCatch('this', ",
+          #        "error = function(e) invisible(NULL)))"),
+          paste0("tmp <- substitute(suppressMessages(suppressWarnings(",
+                 "tryCatch('this', error = function(e) invisible(NULL)))))"),
+          # #--->> this is for simple `tryCatch` (kept just for ref)
+          # paste0("\ntmp[[2]] <- ", "substitute(expr", env_str, "\n"),
+          paste0("\ntmp[[2]][[2]][[2]] <- ", "substitute(expr", env_str, "\n"),
+          paste0("fbm_part[[",
+                 ifelse(after, tloc[length(tloc)] + 1, tloc[length(tloc)]), "]]"),
+          " <- tmp", "\n")
 
-      "fbm_part -> ", paste0("fbody_mod", taget_brackets)
-    )
+    }else{
+      code <-
+        paste0(
+          code,
+          paste0("fbm_part[[",
+                 ifelse(after, tloc[length(tloc)] + 1, tloc[length(tloc)]), "]]"),
+          " <- ", "substitute(expr", env_str, "\n")
+    }
+    code <-
+      paste0(
+        code,
+        "fbm_part -> ", paste0("fbody_mod", taget_brackets))
 
     eval(parse(text = code))
   }
@@ -194,17 +272,45 @@ store_original_function <- function(f, env = NULL) {
 
 # Argument manipulation
 
-modify_args <- function(fn, new_arg = NULL){
+check_args_in_body <- function(fn){
+  args_def <- formals(fn)
+  bd <- as.character(body(fn))
+  chk <- unlist(lapply(names(args_def), function(an) any(grepl(an, bd))))
+  args_def[chk]
+}
 
-  # early exit
-  # do nothing if no new_arg supplied
-  if(is.null(new_arg)) return(fn)
+integrate_formals <- function(new_arg, old_arg){
+  final_new_arg <- new_arg
+  old_names <- setdiff(names(old_arg), names(new_arg))
+  if(length(old_names)>0){
+   for(on in old_names){
+     final_new_arg[[on]] <- old_arg[[on]]
+   }
+  }
+  final_new_arg
+}
+
+modify_args <- function(fn, new_arg = NULL,
+                        integrate_with_old_formals = TRUE,
+                        use_in_body_arg_for_integration = TRUE){
 
   # this can be used to track unintentional argument changes
   old_formals <- formals(fn)
+  old_body_formals <- check_args_in_body(fn)
+
+  if(integrate_with_old_formals){
+    old_arg <- old_formals
+    if(use_in_body_arg_for_integration){
+      old_arg <- old_body_formals
+    }
+    new_arg_put <- integrate_formals(new_arg,old_arg)
+  }else{
+    new_arg_put <- new_arg
+  }
+
 
   tryCatch(
-    formals(fn) <- new_arg,
+    formals(fn) <- new_arg_put,
     error = function(e){
       stop(
         paste0(
@@ -217,8 +323,17 @@ modify_args <- function(fn, new_arg = NULL){
   )
 
   if(length(setdiff(names(old_formals), names(formals(fn))))>0){
+    body_arg_missed <- FALSE
+    if(length(setdiff(names(old_body_formals), names(formals(fn))))>0){
+      body_arg_missed <- TRUE
+    }
     warning(
-      "At least one old argument is missed. Make sure that is intentional.",
+      paste0(
+        "At least one ",
+        ifelse(body_arg_missed,
+               "'used in body argument (old argument)'","'old argument'"),
+        " is missed. Make sure that is intentional."
+      ),
       call. = FALSE
     )
   }

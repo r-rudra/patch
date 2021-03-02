@@ -28,10 +28,19 @@ details_of_function <- function(f, env = environment()){
   # if(cls %in% c("S4_slot","dollar")) stop("Not implemented yet!",call. = FALSE)
 
 
+  sys_fr_target <- new.env()
+
   if(cls == "unknown"){
     if(!grepl("[^0-9a-zA-Z_\\.]+",fs)){
       if(exists(fs, mode = "function")){
         cls <- "function_in_search_path"
+      }else{
+        # check in sys.frames
+        schk <- locate_object(fs, envs = sys.frames())
+        if(schk$found & isTRUE(schk$pos_rev>0)){
+          sys_fr_target <- schk$env
+          cls <- "function_in_sys.frames"
+        }
       }
     }
   }
@@ -54,7 +63,7 @@ details_of_function <- function(f, env = environment()){
 
   # assign_back options
   # TODO
-  fd$assign_back <- function(new_body, new_arg){
+  fd$assign_back <- function(new_body, new_arg, new_arg_integrate){
     stop("Not implemented yet!", call. = FALSE)
   }
 
@@ -62,9 +71,9 @@ details_of_function <- function(f, env = environment()){
     package_name <- as.character(fc[[2]])
     package_fn <- as.character(fc[[3]])
 
-    fd$assign_back <- function(new_body, new_arg){
+    fd$assign_back <- function(new_body, new_arg, new_arg_integrate){
       body(f_mod) <- new_body
-      f_mod <- modify_args(f_mod, new_arg)
+      f_mod <- modify_args(f_mod, new_arg, new_arg_integrate)
       redefine_package_object(package_name, package_fn, f_mod)
     }
 
@@ -74,10 +83,10 @@ details_of_function <- function(f, env = environment()){
 
   if(cls == "function_in_search_path"){
     # fl_info and where_this should be already defined
-    fd$assign_back <- function(new_body, new_arg){
+    fd$assign_back <- function(new_body, new_arg, new_arg_integrate){
       if(where_this %in% search()){
         body(f_mod) <- new_body
-        f_mod <- modify_args(f_mod, new_arg)
+        f_mod <- modify_args(f_mod, new_arg, new_arg_integrate)
         tryCatch(
           assign(fs, f_mod, pos = where_this),
           error = function(e){
@@ -88,6 +97,25 @@ details_of_function <- function(f, env = environment()){
           }
         )
       }
+    }
+
+    fd$auto_assign_possible <- TRUE
+  }
+
+  if(cls == "function_in_sys.frames"){
+    # sys_fr_target should be already defined
+    fd$assign_back <- function(new_body, new_arg, new_arg_integrate){
+      body(f_mod) <- new_body
+      f_mod <- modify_args(f_mod, new_arg, new_arg_integrate)
+      tryCatch(
+        assign(fs, f_mod, envir = sys_fr_target),
+        error = function(e){
+          # mostly it is locked
+          unlockBinding(fs, sys_fr_target)
+          assign(fs, f_mod, envir = sys_fr_target)
+          lockBinding(fs, sys_fr_target)
+        }
+      )
     }
 
     fd$auto_assign_possible <- TRUE
@@ -114,7 +142,9 @@ redefine_package_object <- function(package_name, object_name, object_new_val){
   if(object_name %in% all_names){
     ._set_this(object_name,object_new_val)
   }else{
-    stop(paste0("Function/object named ", object_name,""), call. = FALSE)
+    stop(paste0("Function/object named ", object_name,
+                " not present in {",package_name,"}"),
+         call. = FALSE)
   }
 
   rm(._set_this)
@@ -124,17 +154,35 @@ redefine_package_object <- function(package_name, object_name, object_new_val){
 
 
 
-locate_object <- function(obj_name){
+locate_object <- function(obj_name, envs = search()){
 
-  sp <- search()
+  if(missing(envs)){
+    sp <- search()
 
-  locs <- unlist(lapply(seq_along(sp), function(sn) exists(obj_name, where = sn, inherits = F)))
+    locs <- unlist(
+      lapply(seq_along(sp),
+             function(sn) exists(obj_name, where = sn, inherits = F)))
+
+
+  }else{
+    locs <- unlist(
+      lapply(envs,
+             function(en) exists(obj_name, where = en, inherits = F)))
+  }
 
   res <- list()
 
   res$found <- any(locs)
   res$pos <- which(locs)
-  res$name <- sp[res$pos]
+  if(missing(envs)){
+    res$name <- sp[res$pos]
+  }else{
+    if(any(locs)){
+      res$env <- envs[[res$pos[1]]]
+      res$pos_rev <- length(envs)-res$pos[1]
+    }
+  }
+
 
   res
 

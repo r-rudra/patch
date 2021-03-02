@@ -37,6 +37,10 @@
 #'   the argument `append_after` will be omitted)
 #' @param append_after Whether add after it (`replace_it` should be `FALSE`). If
 #'   set to `FALSE`, the modification will be added before the found match.
+#' @param safely If set to `TRUE` the modification expression (`expr`) will be
+#'   wrapped inside `suppressMessages(suppressWarnings(tryCatch(..)))`. This
+#'   maybe useful if one is not sure how the modification will behave in unknown
+#'   situations.
 #' @param move_up_to Fine-tuning the locator (should be an index within the
 #'   length of locator). Moving up from found match.
 #' @param chop_locator_to Fine-tuning the locator (should be an index within the
@@ -53,6 +57,11 @@
 #'   be considered as additional argument). You can use [`alist`][base::alist()]
 #'   for this (_Remember to give `=` otherwise it will not work_). Leave it to
 #'   `NULL` (default) in case argument alteration is not required.
+#' @param new_arguments_integrate If set to `FALSE` (by default it is `TRUE`)
+#'   then new argument will be passed as it is (replacement of complete
+#'   argument). Otherwise, it will be integrated (or merged) with arguments
+#'   which are used in the body of function directly after the modifications.
+#'   Note: In case few argument is missed warning will be issued accordingly.
 #' @param env In case `expr` is passed from a different location apart from
 #'   global environment. It may be required if `patch_function` is called inside
 #'   a function or in different environment from `.GlobalEnv`
@@ -60,7 +69,10 @@
 #'   patched into it's source. By default `FALSE`. Usethis with care.
 #' @param no_store If set to `TRUE`. It will not try to backup the function in
 #'   current session. (Maybe useful for understanding edit locations before
-#'   actual patch work.)
+#'   actual patch work.). By default is `TRUE`. It can be configured like
+#'   `options(store_function_before_patch = TRUE)`. **Note: The storing and
+#'   restoring mechanism is simply achieved by function names (with minor
+#'   modifications if required).**
 #' @param auto_add_curly_brackets If `TRUE` adds `{}` to single line functions.
 #'   This enables further editing of single functions. _Note: after edit it will
 #'   be no more single line._
@@ -160,12 +172,38 @@ patch_function <- function(
   modification_placement,
   which_match_to_target,
   line_location,
-  replace_it = FALSE, append_after = TRUE,
+  replace_it = FALSE, append_after = TRUE, safely = FALSE,
   move_up_to = NULL, chop_locator_to = NULL, further_locator = integer(0),
   new_arguments = NULL,
+  new_arguments_integrate = TRUE,
   env = NULL,
   auto_assign_patched_function = FALSE,
-  no_store = FALSE,
+  no_store = !isTRUE(getOption("store_function_before_patch")),
+  auto_add_curly_brackets = TRUE
+){
+  mc <- match.call()
+  mc[[1]] <- patch_function_raw
+  tryCatch({
+    eval(mc, envir = parent.frame())
+  }, error = function(e){
+    stop("Some error occurred during patching.", call. = FALSE)
+  })
+}
+
+
+patch_function_raw <- function(
+  f,
+  search_str, expr,
+  modification_placement,
+  which_match_to_target,
+  line_location,
+  replace_it = FALSE, append_after = TRUE, safely = FALSE,
+  move_up_to = NULL, chop_locator_to = NULL, further_locator = integer(0),
+  new_arguments = NULL,
+  new_arguments_integrate = TRUE,
+  env = NULL,
+  auto_assign_patched_function = FALSE,
+  no_store = !isTRUE(getOption("store_function_before_patch")),
   auto_add_curly_brackets = TRUE
 ){
 
@@ -210,9 +248,11 @@ patch_function <- function(
     env <- environment()
   }
 
-  if(!no_store){
-    fs <- store_original_function(f, env = env)
-    if(missing(search_str) & missing(line_location)){
+  if(missing(search_str) & missing(line_location) & missing(new_arguments)){
+    # no modification requested
+    if(!no_store){
+      fs <- store_original_function(f, env = env)
+
       # return original function (since session start)
       if(auto_assign_patched_function){
         auto_assign(f,
@@ -225,8 +265,12 @@ patch_function <- function(
         # exit with printing
         return(fs)
       }
+    }else{
+      cat("\nNothing to do here!\n")
+      return(invisible(f))
     }
   }
+
 
   fbody <- body(f)
 
@@ -245,74 +289,94 @@ patch_function <- function(
     stop("This function can not be modified directly.")
   }
 
-  # default option
-  locate_section_fn <- locate_section
-
-  if(!missing(which_match_to_target)){
-    which_match_to_target <- as.integer(which_match_to_target)
-    if(which_match_to_target>1){
-      locate_section_fn <- function(fbody, str){
-        rawl <- locate_section_rec(fbody, str)
-        rawl[[min(which_match_to_target, length(rawl))]]
-      }
-    }
+  body_change_required <- TRUE
+  if(missing(search_str) & missing(line_location) & !missing(new_arguments)){
+    # only argument change requested
+    body_change_required <- FALSE
   }
 
-  if(!missing(search_str)){
-    if(length(search_str)>1){
-      # match first occurrence
-      for(ss in search_str){
-        tloc <- locate_section_fn(fbody, ss)
-        if(length(tloc)>0) break()
+  if(missing(new_arguments)){
+    new_arguments <- formals(f)
+  }
+
+  if(body_change_required){
+    # default option
+    locate_section_fn <- locate_section
+
+    if(!missing(which_match_to_target)){
+      which_match_to_target <- as.integer(which_match_to_target)
+      if(which_match_to_target>1){
+        locate_section_fn <- function(fbody, str){
+          rawl <- locate_section_rec(fbody, str)
+          rawl[[min(which_match_to_target, length(rawl))]]
+        }
+      }
+    }
+
+    if(!missing(search_str)){
+      if(length(search_str)>1){
+        # match first occurrence
+        for(ss in search_str){
+          tloc <- locate_section_fn(fbody, ss)
+          if(length(tloc)>0) break()
+        }
+      }else{
+        tloc <- locate_section_fn(fbody, search_str)
       }
     }else{
-      tloc <- locate_section_fn(fbody, search_str)
+      tloc <- line_location
     }
+
+    # add further locator at the end
+    tloc <- c(tloc, further_locator)
+
+    if(length(tloc)==0){
+      stop(
+        paste0(
+          "Unable to find supplied string(s) ",
+          "in the body of the target function (or invalid locator)."),
+        call. = FALSE)
+    }
+
+    # move_up_to = length(tloc)-chop_locator_to+1
+    if(!is.null(move_up_to)){
+      move_up_to <- min(move_up_to, length(tloc))
+      chop_locator_to <- length(tloc)-move_up_to+1
+    }
+
+    if(!is.null(chop_locator_to)){
+      chop_locator_to <- min(chop_locator_to, length(tloc))
+      tloc <- tloc[seq(chop_locator_to)]
+    }
+
+
+    if(replace_it){
+      fbody_new <- replace_in_section(fbody, tloc, expr, env = env,
+                                      add_browser = add_browser_here,
+                                      replace_safely = safely)
+    }else{
+      fbody_new <- append_in_section(fbody, tloc, expr, env = env,
+                                     after = append_after,
+                                     add_safely = safely)
+    }
+
   }else{
-    tloc <- line_location
+    fbody_new <- fbody
   }
 
-  # add further locator at the end
-  tloc <- c(tloc, further_locator)
-
-  if(length(tloc)==0){
-    stop(
-      paste0(
-        "Unable to find supplied string(s) ",
-        "in the body of the target function (or invalid locator)."),
-      call. = FALSE)
-  }
-
-  # move_up_to = length(tloc)-chop_locator_to+1
-  if(!is.null(move_up_to)){
-    move_up_to <- min(move_up_to, length(tloc))
-    chop_locator_to <- length(tloc)-move_up_to+1
-  }
-
-  if(!is.null(chop_locator_to)){
-    chop_locator_to <- min(chop_locator_to, length(tloc))
-    tloc <- tloc[seq(chop_locator_to)]
-  }
-
-
-  if(replace_it){
-    fbody_new <- replace_in_section(fbody, tloc, expr, env = env,
-                                    add_browser = add_browser_here)
-  }else{
-    fbody_new <- append_in_section(fbody, tloc, expr, env = env,
-                                   after = append_after)
-  }
 
   if(auto_assign_patched_function){
     auto_assign(f,
                 new_f_body = fbody_new,
-                new_f_arg = new_arguments, env)
-    # early exit without printing
+                new_f_arg = new_arguments,
+                new_f_arg_integrate = new_arguments_integrate,
+                env)
+    # early exit without printing or modifying
     return(invisible(f))
   }
 
   body(f) <- fbody_new
-  f <- modify_args(f, new_arguments)
+  f <- modify_args(f, new_arguments,
+                   integrate_with_old_formals = new_arguments_integrate)
   f
 }
-
