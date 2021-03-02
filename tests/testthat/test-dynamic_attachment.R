@@ -34,5 +34,11 @@ test_that("dynamic_attachment works", {
     "automatically cleared",
   ))
 
+  capture_output(patch_function())
+
+  # https://github.com/r-lib/covr/issues/40
+  .onUnload()
+
+  expect_false("patch:dynamic_attachment" %in% search())
 
 })
