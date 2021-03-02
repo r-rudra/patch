@@ -10,6 +10,7 @@
 # this code is having the same license as main package {patch}
 
 enable_all <- function() {
+
   auto_complete_future_plan <- function() {
     .rs.addJsonRpcHandler(
       "get_completions",
@@ -176,9 +177,11 @@ enable_all <- function() {
 
 
   # implement
+  options(store_function_before_patch = TRUE)
   auto_complete_future_plan()
   auto_complete_dplyr_filter()
   auto_complete_matchArg_functionArgs()
+  options(store_function_before_patch = NULL)
 }
 
 if (exists(".rs.addFunction")) {
