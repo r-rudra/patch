@@ -9,6 +9,85 @@
 # Check this also https://support.rstudio.com/hc/en-us/articles/205273297-Code-Completion
 # this code is having the same license as main package {patch}
 
+
+################################################################################
+# to put this in start-up use usethis::edit_r_profile() or simply edit .Rprofile
+# paste either of the options (code after and before #######>>>>>>> indicator)
+#
+# { # <- this bracket is not required
+#
+#   #######>>>>>>> option 1
+#
+#   #### Load {patch} auto-complete use-cases at start-up
+#   # Note : it has to be using later otherwise .rs* functions will not be loaded in
+#   # R Studio
+#   later::later(
+#     function(){
+#       ef <- system.file("embedded","usecases.R",package = "patch")
+#       if(file.exists(ef)){
+#         source(ef)
+#         cat("{patch} autocomplete use-cases loaded\n")
+#       }
+#     },
+#     # change it appropriately
+#     delay = 5
+#   )
+#
+#   #######>>>>>>>
+#
+#   #######################################################################
+#
+#   #######>>>>>>> option 2
+#
+#   #### Load {patch} auto-complete use-cases at start-up
+#   # Note : it has to be using later otherwise .rs* functions will not be loaded in
+#   # R Studio
+#   later::later(
+#     function(){
+#       ef <- system.file("embedded","usecases.R",package = "patch")
+#       if(file.exists(ef)){
+#         source(ef)
+#         cat("{patch} autocomplete use-cases loaded\n")
+#       }
+#
+#       ##### {later} unloading
+#       # This part can be avoided if you "require" or "don't mind" {later} loaded
+#       # Note this will unload any other packages loaded during start-up so decide
+#       # accordingly.
+#       on.exit({
+#         tryCatch(
+#           {
+#             si <- sessionInfo()
+#
+#             base <- names(which(lapply(si$loadedOnly,`[[`, "Priority") == "base"))
+#             base <- unique(c(base, si$basePkgs))
+#
+#             to_unload <- setdiff(loadedNamespaces(),
+#                                  # as patch is required
+#                                  # retain other packages as required
+#                                  # or you may completely delete this section
+#                                  c(base, "patch"))
+#
+#             for(ln in to_unload){
+#               tryCatch(
+#                 unloadNamespace(ln),
+#                 error = function(e) NULL
+#               )
+#             }
+#           },
+#           error = function(e) NULL
+#         )
+#       })
+#     },
+#     # change it appropriately
+#     delay = 5
+#   )
+#
+#   #######>>>>>>>
+#
+# } # <- this bracket is not required
+################################################################################
+
 enable_all <- function() {
 
   auto_complete_future_plan <- function() {
