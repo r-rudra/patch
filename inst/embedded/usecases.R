@@ -153,6 +153,7 @@ enable_all <- function() {
                 safe_lim <- ifelse(is.null(safe_lim), 10^6, safe_lim)
                 if (nrow(chainObject) < safe_lim) {
                   this_col <- chainObject[[cname_attempt]]
+                  this_col <- this_col[!is.na(this_col)]
                   if (is.character(this_col) | is.factor(this_col)) {
                     if (is.factor(this_col)) {
                       choices <- levels(this_col)
